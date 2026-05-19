@@ -3,18 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <title>My 3D Model Website</title>
-    <!-- Import the viewer component -->
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <style>
+        body { background-color: #000; color: #ddd; margin: 0; }
+        model-viewer { background-color: #000; display: block; }
+        #mv-controls { background: rgba(0,0,0,0.85); color: #fff; }
+        #mv-controls select { background: #0b0b0b; color: #fff; border: 1px solid #333; }
+    </style>
 </head>
 <body>
 
-    <!-- Display the 3D model with zoom and rotation controls -->
-    <model-viewer src="Untitled.glb" 
-                  ar 
-                  camera-controls 
-                  touch-action="pan-y" 
-                  style="width: 100%; height: 1000px;">
+    <model-viewer src="Untitled.glb"
+                  alt="3D model"
+                  camera-controls
+                  auto-rotate
+                  exposure="0.4"
+                  style="width: 100vw; height: 80vh; display: block; background-color: #000;">
     </model-viewer>
+
+    <div id="mv-controls" style="position:fixed;top:8px;left:8px;z-index:10;padding:8px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15)">
+        <label for="partSelect">Material Part:</label>
+        <select id="partSelect" style="min-width:180px;margin-left:6px;background:#0b0b0b;color:#fff;border:1px solid #333"></select>
+    </div>
+
+    <script>
+        const mv = document.querySelector('model-viewer');
+        const select = document.getElementById('partSelect');
+
+        mv.addEventListener('load', () => {
+    // 1. Clear options and create the 'All' option
+    select.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '__all';
+    allOpt.textContent = 'All parts';
+    select.appendChild(allOpt);
+
+    // 2. Loop through materials using the native model-viewer API
+    const materials = mv.model.materials;
+    
+    materials.forEach((material, index) => {
+        // Fallback: If the material has no name in the GLB file, give it a number
+        const displayName = material.name && material.name.trim() ? material.name : `Material-${index + 1}`;
+        
+        // Save the generated name back to the object so applyColorTo can find it
+        if (!material.name) {
+            material.name = displayName;
+        }
+
+        // Populate dropdown menu
+        const opt = document.createElement('option');
+        opt.value = displayName;
+        opt.textContent = displayName;
+        select.appendChild(opt);
+
+        // Adjust roughness/metalness to reduce brightness natively
+        const pbr = material.pbrMetallicRoughness;
+        pbr.setRoughnessFactor(Math.min(1, pbr.roughnessFactor + 0.3));
+        pbr.setMetalnessFactor(Math.max(0, pbr.metalnessFactor - 0.2));
+    });
+});
+
+        // Helper function to convert Hex (#ffffff) to Normalized RGB ([1, 1, 1])
+        function hexToRgbArray(hex) {
+            hex = hex.replace('#', '');
+            if (hex.length === 3) {
+                hex = hex.split('').map(c => c + c).join('');
+            }
+            const r = parseInt(hex.substring(0, 2), 16) / 255;
+            const g = parseInt(hex.substring(2, 4), 16) / 255;
+            const b = parseInt(hex.substring(4, 6), 16) / 255;
+            return [r, g, b, 1.0]; // Includes alpha channel required by model-viewer
+        }
+
+        function applyColorTo(materialName, hexColor) {
+            const rgbColor = hexToRgbArray(hexColor);
+
+            mv.model.materials.forEach((material) => {
+                if (materialName === '__all' || material.name === materialName) {
+                    // Update base color factor natively
+                    material.pbrMetallicRoughness.setBaseColorFactor(rgbColor);
+                }
+            });
+        }
+
+        // Example trigger you can test in the browser console:
+        // applyColorTo('All parts', '#ff0000');
+    </script>
 
 </body>
 </html>
